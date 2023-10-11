@@ -111,22 +111,65 @@ def get_packet(transmit_type: str, end_byte: str, marker: str = "S",
     return packet
 
 
-packet = get_packet('0', ETX)
-start_packet = STX + packet
-
-start= bytes(start_packet, 'ascii')
-print(start)
-s = socket.socket()
-s.connect((ip_port['ip'], ip_port['port']))
-s.send(bytes(ENQ, 'ascii'))
-print(f'Данные отправлены {ENQ}')
-data = s.recv(1024)
-print(answer(data))
-s.send(start)
-print(f'Данные отправлены {start}')
-data = s.recv(1024)
-print(answer(data))
+def data_packet(number: int, value: int, end_byte: str,
+                marker: str = "D", task_type: str = '*', operation: str = "C", ):
+    value = ' ' * (10 - len(str(value))) + str(value)
+    packet = marker + task_type + operation + str(number) + str(value) + end_byte
+    crc = get_crc(packet)
+    packet += crc
+    return packet
 
 
+def universal_packet(*args, **kwargs):
+   # data = (sum(i) for i in args)
+    data = ''
+    for i in args:
+        data += i
+    return data
 
 
+    # crc = get_crc(data)
+    # data += crc
+    # return data
+
+
+def normalize(value, depth):
+    return SP * (depth - len(str(value))) + str(value)
+
+
+def depositing(number, value):
+    start_packet = universal_packet('S*1', 36 * SP, ETX)
+    return start_packet
+
+
+if __name__ == '__main__':
+    s = socket.socket()
+    s.connect((ip_port['ip'], ip_port['port']))
+    s.send(bytes(ENQ, 'ascii'))
+    print(f'Отправлен запрос ENQ')
+    tx = s.recv(1024)
+    print(f' получен ответ: {answer(tx)}')
+
+    packet = STX + get_packet('1', ETX)
+    start = bytes(packet, 'ascii')
+    s.send(start)
+    print(f'отправлен стартовый пакет: \n {start}')
+    tx = s.recv(1024)
+    print(f' получен ответ: {answer(tx)}')
+
+    rx_in = STX + data_packet(2, 33333, ETX)
+    rx_in = bytes(rx_in, 'ascii')
+    s.send(rx_in)
+    print(f'отправлен стартовый пакет: \n {rx_in}')
+    tx = s.recv(1024)
+    print(f' получен ответ: {answer(tx)}')
+    while True:
+        if tx == WACK:
+            tx = s.recv(1024)
+            print(f' получен ответ: {answer(tx)}')
+        else:
+            break
+    s.send(bytes(EOT, 'ascii'))
+    tx = s.recv(1024)
+    print(f' получен ответ: {answer(tx)}')
+    print(universal_packet('S*', 'ETX'))
